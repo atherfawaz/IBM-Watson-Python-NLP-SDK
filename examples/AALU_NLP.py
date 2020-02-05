@@ -30,8 +30,8 @@ with open(join(dirname(__file__), '../resources/speech.wav'),
 parsed = json.loads(output)
 
 #write data to json file 
-with open('C:\\Users\\ather\\Desktop\\data.json', 'w') as outfile:
-    json.dump(parsed, outfile)
+#with open('C:\\Users\\ather\\Desktop\\data.json', 'w') as outfile:
+#    json.dump(parsed, outfile)
 
 #print parsed output to show only the transcript
 print (parsed['results'][0]['alternatives'][0]['transcript'])
