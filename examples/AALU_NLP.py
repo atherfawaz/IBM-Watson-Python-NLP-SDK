@@ -6,15 +6,16 @@ import threading
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
 
-textinput = input("Enter your IBM API: ")
-authenticator = IAMAuthenticator(textinput)
+#textinput = input("Enter your IBM API: ")
+authenticator = IAMAuthenticator('XwvYD2lx1j4b-Ip7BS-JWvcQG_u1-ShyZ43yKRoWf7Ck')
 service = SpeechToTextV1(authenticator=authenticator)
-textinput = input("Enter your IBM Cloud Service URL: ")
-service.set_service_url(textinput)
+#textinput = input("Enter your IBM Cloud Service URL: ")
+service.set_service_url('https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/a848b861-711c-48a8-b2e7-680d73a7ea1f')
 
 models = service.list_models().get_result()
 # print(json.dumps(models, indent=2))
 
+#model = service.get_model('en-US_BroadbandModel').get_result()
 model = service.get_model('en-US_BroadbandModel').get_result()
 # print(json.dumps(model, indent=2))
 
@@ -24,6 +25,7 @@ with open(join(dirname(__file__), '../resources/speech.wav'),
     output = json.dumps(
         service.recognize(
             audio=audio_file,
+            continuous=True,
             content_type='audio/wav').get_result(),
         indent=2)
 
@@ -34,6 +36,7 @@ parsed = json.loads(output)
 #    json.dump(parsed, outfile)
 
 #print parsed output to show only the transcript
+print()
 print (parsed['results'][0]['alternatives'][0]['transcript'])
 
 # Example using websockets
