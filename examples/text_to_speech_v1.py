@@ -1,29 +1,30 @@
 # coding=utf-8
 import json
+import ssl
 from os.path import join, dirname
 from ibm_watson import TextToSpeechV1
 from ibm_watson.websocket import SynthesizeCallback
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
-authenticator = IAMAuthenticator('your_api_key')
+authenticator = IAMAuthenticator('api')
 service = TextToSpeechV1(authenticator=authenticator)
-service.set_service_url('https://stream.watsonplatform.net/text-to-speech/api')
+service.set_service_url('url')
 
 voices = service.list_voices().get_result()
-print(json.dumps(voices, indent=2))
+#print(json.dumps(voices, indent=2))
 
 with open(join(dirname(__file__), '../resources/output.wav'),
           'wb') as audio_file:
     response = service.synthesize(
-        'Hello world!', accept='audio/wav',
-        voice="en-US_AllisonVoice").get_result()
+        'I will replace Aftab. Just wait and watch. Ha ha ha ha', accept='audio/wav',
+        voice="en-US_MichaelV3Voice").get_result()
     audio_file.write(response.content)
 
 pronunciation = service.get_pronunciation('Watson', format='spr').get_result()
 print(json.dumps(pronunciation, indent=2))
 
-voice_models = service.list_voice_models().get_result()
-print(json.dumps(voice_models, indent=2))
+#voice_models = service.list_voices().get_result()
+#print(json.dumps(voice_models, indent=2))
 
 # voice_model = service.create_voice_model('test-customization').get_result()
 # print(json.dumps(voice_model, indent=2))
