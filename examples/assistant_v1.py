@@ -1,19 +1,19 @@
 import json
 from ibm_watson import AssistantV1
-# from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
 
 # Authentication via IAM
-# authenticator = IAMAuthenticator('your apikey')
-# assistant = AssistantV1(
-#     version='2018-07-10',
-#     authenticator=authenticator)
-# assistant.set_service_url('https://gateway.watsonplatform.net/assistant/api')
+authenticator = IAMAuthenticator('yjsnqyHlLV6Hre2gSL9LqtdAaU9hhRBm7Y_f3k8QTS0v')
+assistant = AssistantV1(
+     version='2018-07-10',
+     authenticator=authenticator)
+assistant.set_service_url('https://api.us-south.assistant.watson.cloud.ibm.com/instances/20b1e02e-12ff-4ab0-87e6-469aa5868021')
 
 
 # Authentication via external config like VCAP_SERVICES
-assistant = AssistantV1(version='2018-07-10')
-assistant.set_service_url('https://gateway.watsonplatform.net/assistant/api')
+#assistant = AssistantV1(version='2018-07-10')
+#assistant.set_service_url('https://api.us-south.assistant.watson.cloud.ibm.com/instances/20b1e02e-12ff-4ab0-87e6-469aa5868021')
 
 #########################
 # Workspaces
@@ -54,14 +54,14 @@ response = assistant.create_workspace(
     entities=create_workspace_data['entities'],
     counterexamples=create_workspace_data['counterexamples'],
     metadata=create_workspace_data['metadata']).get_result()
-print(json.dumps(response, indent=2))
+#print(json.dumps(response, indent=2))
 
 workspace_id = response['workspace_id']
-print('Workspace id {0}'.format(workspace_id))
+#print('Workspace id {0}'.format(workspace_id))
 
 response = assistant.get_workspace(
     workspace_id=workspace_id, export=True).get_result()
-print(json.dumps(response, indent=2))
+#print(json.dumps(response, indent=2))
 
 #  message
 response = assistant.message(
@@ -77,12 +77,12 @@ response = assistant.message(
 print(json.dumps(response, indent=2))
 
 response = assistant.list_workspaces().get_result()
-print(json.dumps(response, indent=2))
+#print(json.dumps(response, indent=2))
 
 response = assistant.update_workspace(
     workspace_id=workspace_id,
     description='Updated test workspace.').get_result()
-print(json.dumps(response, indent=2))
+#print(json.dumps(response, indent=2))
 
 # see cleanup section below for delete_workspace example
 

@@ -35,7 +35,7 @@ audio_source = AudioSource(q, True, True)
 ###############################################
 
 # initialize speech to text service
-authenticator = IAMAuthenticator('your_api_key')
+authenticator = IAMAuthenticator('XwvYD2lx1j4b-Ip7BS-JWvcQG_u1-ShyZ43yKRoWf7Ck')
 speech_to_text = SpeechToTextV1(authenticator=authenticator)
 
 # define callback for the speech to text service
