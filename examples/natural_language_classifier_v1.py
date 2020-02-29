@@ -1,12 +1,13 @@
 import json
 import os
+import ssl
 
 from ibm_watson import NaturalLanguageClassifierV1
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
-authenticator = IAMAuthenticator('your_api_key')
+authenticator = IAMAuthenticator('yjsnqyHlLV6Hre2gSL9LqtdAaU9hhRBm7Y_f3k8QTS0v')
 service = NaturalLanguageClassifierV1(authenticator=authenticator)
-service.set_service_url('https://gateway.watsonplatform.net/natural-language-classifier/api')
+service.set_service_url('https://api.us-south.assistant.watson.cloud.ibm.com/instances/20b1e02e-12ff-4ab0-87e6-469aa5868021')
 
 classifiers = service.list_classifiers().get_result()
 print(json.dumps(classifiers, indent=2))
