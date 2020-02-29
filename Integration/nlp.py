@@ -187,12 +187,17 @@ def get_answer(transcript):
 
     parsed_message = json.loads(message)
     reply = parsed_message['output']['generic'][0]['text']
+    intent = parsed_message['output']['intents'][0]['intent']
 
-    print("Your question: ", transcript)
-    print("Reply: ", reply)
+    if (intent is not 'search'):   
+        print("Your question: ", transcript)
+        print("Reply: ", reply)
+        
+        get_speech(transcript, reply)
+    else:
+        #google api call    
 
-    get_speech(transcript, reply)
-
+#STT
 def read_audio(ws, timeout):
     """Read audio and sent it to the websocket port.
 
@@ -243,6 +248,7 @@ def read_audio(ws, timeout):
     # ... and kill the audio device
     #p.terminate()
 
+#SST
 def on_message(self, msg):
     """Print whatever messages come in.
 
@@ -262,10 +268,12 @@ def on_message(self, msg):
         # This prints out the current fragment that we are working on
         print(data['results'][0]['alternatives'][0]['transcript'])
 
+#SST
 def on_error(self, error):
     """Print any errors."""
     print(error)
 
+#SST
 def on_close(ws):
     """Upon close, print the complete and final transcript."""
     transcript = "".join([x['results'][0]['alternatives'][0]['transcript']
@@ -274,6 +282,7 @@ def on_close(ws):
     # print(transcript)
     get_answer(transcript)
 
+#SST
 def on_open(ws):
     """Triggered as soon a we have an active connection."""
     args = ws.args
@@ -299,6 +308,7 @@ def on_open(ws):
     threading.Thread(target=read_audio,
                      args=(ws, args.timeout)).start()
 
+#SST
 def get_url():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
@@ -310,12 +320,14 @@ def get_url():
     return ("wss://{}/speech-to-text/api/v1/recognize"
             "?model=en-US_BroadbandModel").format(host)
 
+#SST
 def get_auth():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
     apikey = config.get('auth', 'apikey')
     return ("apikey", apikey)
 
+#SST
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Transcribe Watson text in real time')
