@@ -30,21 +30,16 @@ from os.path import join, dirname
 from ibm_watson import TextToSpeechV1
 import wave
 from ibm_watson.websocket import SynthesizeCallback
-#import textinput
-
 import os
 import logging
-
 import click
 import google.auth.transport.grpc
 import google.auth.transport.requests
 import google.oauth2.credentials
-
 from google.assistant.embedded.v1alpha2 import (
     embedded_assistant_pb2,
     embedded_assistant_pb2_grpc
 )
-
 import googlesamples.assistant.grpc.assistant_helpers as assistant_helpers
 import googlesamples.assistant.grpc.browser_helpers as browser_helpers
 
@@ -192,7 +187,7 @@ def GoogleAPI(api_endpoint, credentials,
     # Create an authorized gRPC channel.
     grpc_channel = google.auth.transport.grpc.secure_authorized_channel(
         credentials, http_request, api_endpoint)
-    logging.info('Connecting to %s', api_endpoint)
+    logging.info('Connected to %s', api_endpoint)
 
     with SampleTextAssistant(lang, device_model_id, device_id, display,
                              grpc_channel, grpc_deadline) as assistant:
@@ -306,8 +301,12 @@ def get_answer(transcript):
 
     parsed_message = json.loads(message)
     reply = parsed_message['output']['generic'][0]['text']
+    intent = parsed_message['output']['intents'][0]['intent']
 
-    if (transcript.find('Google') == -1 and transcript.find('google') == -1):
+    print("INTENT: ", intent)
+
+    #if (transcript.find('Google') == -1 and transcript.find('google') == -1):
+    if (intent != 'Search'):
         print("Your question: ", transcript)
         print("Reply: ", reply)
         get_speech(transcript, reply)
