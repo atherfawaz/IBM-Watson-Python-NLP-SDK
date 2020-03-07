@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Sample that implements a text client for the Google Assistant Service."""
-
 import os
 import logging
 import json
@@ -28,15 +26,11 @@ from google.assistant.embedded.v1alpha2 import (
     embedded_assistant_pb2_grpc
 )
 
-try:
-    from . import (
-        assistant_helpers,
-        browser_helpers,
-    )
-except (SystemError, ImportError):
-    import assistant_helpers
-    import browser_helpers
+import googlesamples.assistant.grpc.assistant_helpers as assistant_helpers
+import googlesamples.assistant.grpc.browser_helpers as browser_helpers
 
+
+"""Sample that implements a text client for the Google Assistant Service."""
 
 ASSISTANT_API_ENDPOINT = 'embeddedassistant.googleapis.com'
 DEFAULT_GRPC_DEADLINE = 60 * 3 + 5
@@ -155,11 +149,19 @@ class SampleTextAssistant(object):
               help='gRPC deadline in seconds')
 
 
-def main(api_endpoint, credentials,
+def GoogleAPI(api_endpoint, credentials,
          device_model_id, device_id, lang, display, verbose,
-         grpc_deadline, *args, **kwargs):
+         grpc_deadline):
     # Setup logging.
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
+
+    print("API: ", api_endpoint)
+    print("crede: ", credentials)
+    print("device id: ", device_id)
+    print("device model id: ", device_model_id)
+    print("lang: ", lang)
+    print("display: ", display)
+    print("grpc: ", grpc_deadline)
 
     # Load OAuth 2.0 credentials.
     try:
@@ -178,6 +180,7 @@ def main(api_endpoint, credentials,
     grpc_channel = google.auth.transport.grpc.secure_authorized_channel(
         credentials, http_request, api_endpoint)
     logging.info('Connecting to %s', api_endpoint)
+
     with SampleTextAssistant(lang, device_model_id, device_id, display,
                              grpc_channel, grpc_deadline) as assistant:
         while True:
@@ -189,7 +192,3 @@ def main(api_endpoint, credentials,
                 system_browser.display(response_html)
             if response_text:
                 click.echo('<@assistant> %s' % response_text)
-
-
-if __name__ == '__main__':
-    main()

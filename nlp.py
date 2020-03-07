@@ -86,12 +86,14 @@ PYAUDIO_OBJ_INPUT = pyaudio.PyAudio()
 # GLOBALS
 
 
+
+
+
 """Sample that implements a text client for the Google Assistant Service."""
 
 ASSISTANT_API_ENDPOINT = 'embeddedassistant.googleapis.com'
 DEFAULT_GRPC_DEADLINE = 60 * 3 + 5
 PLAYING = embedded_assistant_pb2.ScreenOutConfig.PLAYING
-
 
 class SampleTextAssistant(object):
     """Sample Assistant that supports text based conversations.
@@ -172,8 +174,8 @@ class SampleTextAssistant(object):
 
 
 def GoogleAPI(api_endpoint, credentials,
-              device_model_id, device_id, lang, display, verbose,
-              grpc_deadline, transcript):
+         device_model_id, device_id, lang, display, verbose,
+         grpc_deadline, transcript):
     # Setup logging.
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
     # Load OAuth 2.0 credentials.
@@ -196,8 +198,8 @@ def GoogleAPI(api_endpoint, credentials,
 
     with SampleTextAssistant(lang, device_model_id, device_id, display,
                              grpc_channel, grpc_deadline) as assistant:
-        # while True:
-        #query = click.prompt('')
+        #while True:
+            #query = click.prompt('')
         click.echo('<you> %s' % transcript)
         response_text, response_html = assistant.assist(text_query=transcript)
         if display and response_html:
@@ -206,6 +208,8 @@ def GoogleAPI(api_endpoint, credentials,
         if response_text:
             click.echo('<@assistant> %s' % response_text)
             return response_text
+
+
 
 
 # sets up the variables
@@ -254,6 +258,13 @@ def authentication_function():
 
 
 def get_speech(transcript, reply):
+    #authenticator = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
+    #service = TextToSpeechV1(authenticator=authenticator)
+    # service.set_service_url(
+    #    'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/2a38c46e-2eb1-4376-8a09-a7c1713865a4')
+
+    #voices = service.list_voices().get_result()
+    # print(json.dumps(voices, indent=2))
 
     # watson api call
     with open("D:\\dev\\IBM_Watson\\Integration\\resources\\test.wav",
@@ -285,12 +296,38 @@ def get_speech(transcript, reply):
     stream.stop_stream()
     stream.close()
 
+    # close PyAudio
+    # p2.terminate()
+    # pronunciation = service.get_pronunciation('Watson', format='spr').get_result()
+    # print(json.dumps(pronunciation, indent=2))
+
+# uses watson to get an answer for convo
+
 
 def get_answer(transcript):
+    # authenticator = IAMAuthenticator('AGesgrUJa4L4OVBHpbJgTKfOeCU6kVeVxo2qhIVFqIYS')  #put the general watson api key here
+    # assistant = AssistantV2(
+    #    version='2018-09-20',
+    #    authenticator=authenticator)
+    # assistant.set_service_url(
+    #    'https://api.us-south.assistant.watson.cloud.ibm.com/instances/28f6a127-f399-482b-9b66-5502ad5af6f5')
+
+    #########################
+    # Sessions
+    #########################
+
+    # session = assistant.create_session("82b5e8f6-5a1d-44a5-930e-a388332db998").get_result() #put the specific assistant api key
+    # print(json.dumps(session, indent=2))
+    #key = session.get("session_id", "")
+
+    # assistant.delete_session(
+    #    "478bd1ae-7f5a-40b5-b40c-98e1d28ffd99", session).get_result()
 
     #########################
     # Message
     #########################
+
+    transcript = 'Google who is the President of Pakistan?'
 
     # put the specific assistant api key
     message = json.dumps(WATSON_ASSISTANT.message(
@@ -306,6 +343,10 @@ def get_answer(transcript):
 
     parsed_message = json.loads(message)
     reply = parsed_message['output']['generic'][0]['text']
+    intent = parsed_message['output']['intents'][0]['intent']
+
+    #print("Intent: ", intent)
+    #intent = 'Search'
 
     if (transcript.find('Google') == -1 and transcript.find('google') == -1):
         print("Your question: ", transcript)
@@ -313,24 +354,23 @@ def get_answer(transcript):
         get_speech(transcript, reply)
     else:
         api_key = 'embeddedassistant.googleapis.com'
-        credentials = 'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
-        device_id = '6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d'
-        device_model_id = 'watson-73b2e-watsongoogle-famt7c'
+        credentials =  'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
+        device_id =  '6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d'
+        device_model_id =  'watson-73b2e-watsongoogle-famt7c'
         lang = 'en-US'
-        display = False
+        display =  False
         verbose = False
         grpc = 185
 
-        reply = GoogleAPI(api_key, credentials, device_model_id,
-                          device_id, lang, display, verbose, grpc, transcript)
-        if (reply is None):
+        reply = GoogleAPI(api_key, credentials, device_model_id, device_id, lang, display, verbose, grpc, transcript)
+        if (reply == None):
             reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
             print("Your question: ", transcript)
             print("Reply: ", reply)
             get_speech(transcript, reply)
         else:
             get_speech(transcript, reply)
-
+        
 
 # STT
 
@@ -507,7 +547,7 @@ def main():
 
     authentication_function()
 
-    # while (True):
+    #while (True):
     ws = websocket.WebSocketApp(URL,
                                 header=HEADERS,
                                 on_message=on_message,
