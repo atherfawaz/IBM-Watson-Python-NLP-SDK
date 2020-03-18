@@ -42,8 +42,7 @@ from google.assistant.embedded.v1alpha2 import (
 )
 import googlesamples.assistant.grpc.assistant_helpers as assistant_helpers
 import googlesamples.assistant.grpc.browser_helpers as browser_helpers
-from ibm_watson import ToneAnalyzerV3
-from ibm_watson.tone_analyzer_v3 import ToneInput
+
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
@@ -58,8 +57,7 @@ CHANNELS = 1
 RATE = 44100
 RECORD_SECONDS = 5
 FINALS = []
-WATSON_INTENTS = {'attendance', 'availability', 'drop_course',
-                  'Goodbye', 'Greeting', 'marks', 'mood', 'printfee', 'reg_course'}
+WATSON_INTENTS = {'attendance', 'availability', 'drop_course', 'Goodbye', 'Greeting', 'marks', 'mood', 'printfee', 'reg_course'}
 
 REGION_MAP = {
     'us-east': 'gateway-wdc.watsonplatform.net',
@@ -79,8 +77,6 @@ WATSON_ASSISTANT = None
 HEADERS = None
 USERPASS = None
 URL = None
-TONE_AUTHENTICATOR = None
-TONE_SERVICE = None
 PYAUDIO_OBJ = pyaudio.PyAudio()
 PYAUDIO_OBJ_INPUT = pyaudio.PyAudio()
 # GLOBALS
@@ -209,6 +205,7 @@ def GoogleAPI(api_endpoint, credentials,
 
 
 # sets up the variables
+
 def authentication_function():
 
     global TTS_AUTH
@@ -219,8 +216,6 @@ def authentication_function():
     global HEADERS
     global USERPASS
     global URL
-    global TONE_AUTHENTICATOR
-    global TONE_SERVICE
 
     # TTS
     TTS_AUTH = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
@@ -246,24 +241,10 @@ def authentication_function():
         authenticator=WATSON_AUTH)
     WATSON_ASSISTANT.set_service_url(
         'https://api.us-south.assistant.watson.cloud.ibm.com/instances/28f6a127-f399-482b-9b66-5502ad5af6f5')
-    # WATSON_ASSISTANT.set_service_url(
-    #    'https://api.us-south.assistant.watson.cloud.ibm.com/instances/28f6a127-f399-482b-9b66-5502ad5af6f5')
-    # session = WATSON_ASSISTANT.create_session(
-    #    "82b5e8f6-5a1d-44a5-930e-a388332db998").get_result()  # put the specific assistant api key
     session = WATSON_ASSISTANT.create_session(
-        "1ed1fac7-0d02-47d1-ae2b-d0ad3b6f6624").get_result()  # put the specific assistant api key
+        "82b5e8f6-5a1d-44a5-930e-a388332db998").get_result()  # put the specific assistant api key
     WATSON_KEY = session.get("session_id", "")
     # END WATSON
-
-    # TONE ANALYZER
-    TONE_AUTHENTICATOR = IAMAuthenticator(
-        'b0DmzKxaFck7YymuFStEYpJPMmt_bbYLPu8fPO9aEend')
-    TONE_SERVICE = ToneAnalyzerV3(
-        version='2017-09-21',
-        authenticator=TONE_AUTHENTICATOR)
-    TONE_SERVICE.set_service_url(
-        'https://api.us-south.tone-analyzer.watson.cloud.ibm.com/instances/4a4d15eb-5212-447b-8da9-dcad6434130a')
-    # TONE ANALUZER
 
 # TTS
 
@@ -304,7 +285,7 @@ def get_speech(transcript, reply):
 def get_answer(transcript):
     # put the specific assistant api key
     message = json.dumps(WATSON_ASSISTANT.message(
-        "1ed1fac7-0d02-47d1-ae2b-d0ad3b6f6624", WATSON_KEY,
+        "82b5e8f6-5a1d-44a5-930e-a388332db998", WATSON_KEY,
         input={'text': transcript},
         context={
             'metadata': {
@@ -312,17 +293,17 @@ def get_answer(transcript):
             }
         }).get_result())
     # print(json.dumps(message, indent=2))
-    #reply = "".join(message.get('output').get('generic').get(0).get('text'))
+    # reply = "".join(message.get('output').get('generic').get(0).get('text'))
     parsed_message = json.loads(message)
     reply = parsed_message['output']['generic'][0]['text']
     error = "I didn't understand. You can try rephrasing."
     if (reply != error):
-        # if (intent in WATSON_INTENTS):
-        # if (transcript.find('Google') == -1 and transcript.find('google') == -1):
-        # if (intent != 'Search'):
+        #if (intent in WATSON_INTENTS):
+        #if (transcript.find('Google') == -1 and transcript.find('google') == -1):
+        #if (intent != 'Search'):
         print("Your question: ", transcript)
         print("Reply: ", reply)
-        #get_speech(transcript, reply)
+        get_speech(transcript, reply)
     else:
         api_key = 'embeddedassistant.googleapis.com'
         credentials = 'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
@@ -332,30 +313,21 @@ def get_answer(transcript):
         display = False
         verbose = False
         grpc = 185
+
         reply = GoogleAPI(api_key, credentials, device_model_id,
-                          device_id, lang, display, verbose, grpc, transcript)
+                            device_id, lang, display, verbose, grpc, transcript)
         if (reply is None):
             reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
             print("Your question: ", transcript)
             print("Reply: ", reply)
-            #get_speech(transcript, reply)
+            get_speech(transcript, reply)
         else:
-            #get_speech(transcript, reply)
-            dummy = None
-
-    tone = TONE_SERVICE.tone(
-        tone_input=reply, content_type="text/plain").get_result()
-    if(tone['document_tone']['tones']):
-        arr = tone['document_tone']['tones']
-        newlist = sorted(arr, key=lambda k: k['score'], reverse=True)
-        #{k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
-        tone = newlist[0]['tone_name']
-    else:
-        tone = "Neutral"
-    print('Reply tone: ', tone)
+            get_speech(transcript, reply)
 
 
 # STT
+
+
 def read_audio(ws, timeout):
     """Read audio and sent it to the websocket port.
 
