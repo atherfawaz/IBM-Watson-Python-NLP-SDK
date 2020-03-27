@@ -251,7 +251,7 @@ def authentication_function():
     # session = WATSON_ASSISTANT.create_session(
     #    "82b5e8f6-5a1d-44a5-930e-a388332db998").get_result()  # put the specific assistant api key
     session = WATSON_ASSISTANT.create_session(
-        "1ed1fac7-0d02-47d1-ae2b-d0ad3b6f6624").get_result()  # put the specific assistant api key
+        "9bf7bf36-235e-4089-bf1d-113791da5b43").get_result()  # put the specific assistant api key
     WATSON_KEY = session.get("session_id", "")
     # END WATSON
 
@@ -304,7 +304,7 @@ def get_speech(transcript, reply):
 def get_answer(transcript):
     # put the specific assistant api key
     message = json.dumps(WATSON_ASSISTANT.message(
-        "1ed1fac7-0d02-47d1-ae2b-d0ad3b6f6624", WATSON_KEY,
+        "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
         input={'text': transcript},
         context={
             'metadata': {
@@ -408,8 +408,6 @@ def read_audio(ws, timeout):
     # p.terminate()
 
 # SST
-
-
 def on_message(self, msg):
     """Print whatever messages come in.
 
@@ -430,15 +428,11 @@ def on_message(self, msg):
         print(data['results'][0]['alternatives'][0]['transcript'])
 
 # SST
-
-
 def on_error(self, error):
     """Print any errors."""
     print(error)
 
 # SST
-
-
 def on_close(ws):
     """Upon close, print the complete and final transcript."""
     transcript = "".join([x['results'][0]['alternatives'][0]['transcript']
@@ -448,8 +442,6 @@ def on_close(ws):
     get_answer(transcript)
 
 # SST
-
-
 def on_open(ws):
     """Triggered as soon a we have an active connection."""
     args = ws.args
@@ -476,8 +468,6 @@ def on_open(ws):
                      args=(ws, args.timeout)).start()
 
 # SST
-
-
 def get_url():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
@@ -490,8 +480,6 @@ def get_url():
             "?model=en-US_BroadbandModel").format(host)
 
 # SST
-
-
 def get_auth():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
@@ -499,8 +487,6 @@ def get_auth():
     return ("apikey", apikey)
 
 # SST
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Transcribe Watson text in real time')
@@ -540,6 +526,7 @@ def main():
     # call, so it won't return until the ws.close() gets called (after
     # 6 seconds in the dedicated thread).
     while(True):
+        input("\nPress enter to proceed...")
         ws.run_forever()
 
 
