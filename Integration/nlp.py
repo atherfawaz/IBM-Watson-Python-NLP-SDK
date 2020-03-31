@@ -266,8 +266,6 @@ def authentication_function():
     # TONE ANALUZER
 
 # TTS
-
-
 def get_speech(transcript, reply):
 
     # watson api call
@@ -525,8 +523,8 @@ def main():
     # This gives control over the WebSocketApp. This is a blocking
     # call, so it won't return until the ws.close() gets called (after
     # 6 seconds in the dedicated thread).
+    input("\nPress enter to proceed...\n")
     while(True):
-        input("\nPress enter to proceed...")
         ws.run_forever()
 
 
