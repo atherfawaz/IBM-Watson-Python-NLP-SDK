@@ -14,29 +14,19 @@
 
 """Sample that implements a text client for the Google Assistant Service."""
 
-import os
-import logging
 import json
+import logging
 
 import click
 import google.auth.transport.grpc
 import google.auth.transport.requests
 import google.oauth2.credentials
-
+import googlesamples.assistant.grpc.assistant_helpers as assistant_helpers
+import googlesamples.assistant.grpc.browser_helpers as browser_helpers
 from google.assistant.embedded.v1alpha2 import (
     embedded_assistant_pb2,
     embedded_assistant_pb2_grpc
 )
-
-try:
-    from . import (
-        assistant_helpers,
-        browser_helpers,
-    )
-except (SystemError, ImportError):
-    import assistant_helpers
-    import browser_helpers
-
 
 ASSISTANT_API_ENDPOINT = 'embeddedassistant.googleapis.com'
 DEFAULT_GRPC_DEADLINE = 60 * 3 + 5
@@ -121,43 +111,9 @@ class SampleTextAssistant(object):
         return text_response, html_response
 
 
-@click.command()
-@click.option('--api-endpoint', default=ASSISTANT_API_ENDPOINT,
-              metavar='<api endpoint>', show_default=True,
-              help='Address of Google Assistant API service.')
-@click.option('--credentials',
-              metavar='<credentials>', show_default=True,
-              default=os.path.join(click.get_app_dir('google-oauthlib-tool'),
-                                   'credentials.json'),
-              help='Path to read OAuth2 credentials.')
-@click.option('--device-model-id',
-              metavar='<device model id>',
-              required=True,
-              help=(('Unique device model identifier, '
-                     'if not specifed, it is read from --device-config')))
-@click.option('--device-id',
-              metavar='<device id>',
-              required=True,
-              help=(('Unique registered device instance identifier, '
-                     'if not specified, it is read from --device-config, '
-                     'if no device_config found: a new device is registered '
-                     'using a unique id and a new device config is saved')))
-@click.option('--lang', show_default=True,
-              metavar='<language code>',
-              default='en-US',
-              help='Language code of the Assistant')
-@click.option('--display', is_flag=True, default=False,
-              help='Enable visual display of Assistant responses in HTML.')
-@click.option('--verbose', '-v', is_flag=True, default=False,
-              help='Verbose logging.')
-@click.option('--grpc-deadline', default=DEFAULT_GRPC_DEADLINE,
-              metavar='<grpc deadline>', show_default=True,
-              help='gRPC deadline in seconds')
-
-
-def main(api_endpoint, credentials,
+def google_search(api_endpoint, credentials,
          device_model_id, device_id, lang, display, verbose,
-         grpc_deadline, *args, **kwargs):
+         grpc_deadline, query):
     # Setup logging.
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
 
@@ -181,8 +137,7 @@ def main(api_endpoint, credentials,
 
     with SampleTextAssistant(lang, device_model_id, device_id, display,
                              grpc_channel, grpc_deadline) as assistant:
-        while True:
-            query = click.prompt('')
+
             click.echo('<you> %s' % query)
             response_text, response_html = assistant.assist(text_query=query)
             if display and response_html:
@@ -190,7 +145,5 @@ def main(api_endpoint, credentials,
                 system_browser.display(response_html)
             if response_text:
                 click.echo('<@assistant> %s' % response_text)
+                return response_text
 
-
-if __name__ == '__main__':
-    main()

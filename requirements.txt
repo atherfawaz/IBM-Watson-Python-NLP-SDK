@@ -1,3 +1,6 @@
+click
+google
+pyaudio
 requests>=2.0,<3.0
 python_dateutil>=2.5.3
 websocket-client==0.48.0

@@ -20,32 +20,21 @@ import configparser
 import json
 import threading
 import time
-import ssl
+import wave
+import socket
+from threading import Thread, Event
+
 import pyaudio
 import websocket
-from websocket._abnf import ABNF
-from ibm_watson import AssistantV2
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from os.path import join, dirname
-from ibm_watson import TextToSpeechV1
-import wave
-from ibm_watson.websocket import SynthesizeCallback
-#import textinput
-import os
+from ibm_watson.Networking.client import send_data, send_wav_data, send_message
+from websocket import ABNF
 
-CHUNK = 1024
-FORMAT = pyaudio.paInt16
-# Even if your default input is multi channel (like a webcam mic),
-# it's really important to only record 1 channel, as the STT service
-# does not do anything useful with stereo. You get a lot of "hmmm"
-# back.
-CHANNELS = 1
-# Rate is important, nothing works without it. This is a pretty
-# standard default. If you have an audio device that requires
-# something different, change this.
-RATE = 44100
-RECORD_SECONDS = 5
-FINALS = []
+import ibm_watson.Integration.Sarcasm.classifier as sarcasm_module
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from ibm_watson import AssistantV2
+from ibm_watson import TextToSpeechV1
+from ibm_watson import ToneAnalyzerV3
+from ibm_watson.Integration.textinput import google_search
 
 REGION_MAP = {
     'us-east': 'gateway-wdc.watsonplatform.net',
@@ -56,7 +45,7 @@ REGION_MAP = {
     'jp-tok': 'gateway-syd.watsonplatform.net',
 }
 
-#GLOBALS
+# GLOBALS
 TTS_AUTH = None
 TTS_SERVICE = None
 WATSON_KEY = None
@@ -65,13 +54,22 @@ WATSON_ASSISTANT = None
 HEADERS = None
 USERPASS = None
 URL = None
+TONE_SERVICE = None
 PYAUDIO_OBJ = pyaudio.PyAudio()
 PYAUDIO_OBJ_INPUT = pyaudio.PyAudio()
-#GLOBALS
+CHUNK = 1024
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+RECORD_SECONDS = 5
+STT = []
+TRANSCRIPT = None
+WAV_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\output.wav"
+JSON_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\data.json"
+# GLOBALS
 
-#sets up the variables
+# sets up the variables
 def authentication_function():
-    
     global TTS_AUTH
     global TTS_SERVICE
     global WATSON_KEY
@@ -80,63 +78,57 @@ def authentication_function():
     global HEADERS
     global USERPASS
     global URL
+    global TONE_SERVICE
 
-    #TTS
+    # TTS
     TTS_AUTH = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
     TTS_SERVICE = TextToSpeechV1(authenticator=TTS_AUTH)
     TTS_SERVICE.set_service_url(
         'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/2a38c46e-2eb1-4376-8a09-a7c1713865a4')
-    #END TTS
+    # END TTS
 
-    #STT 
+    # STT
     HEADERS = {}
     USERPASS = ":".join(get_auth())
     HEADERS["Authorization"] = "Basic " + base64.b64encode(
         USERPASS.encode()).decode()
     URL = get_url()
-    #END STT
+    # END STT
 
-    #WATSON
-    WATSON_AUTH = IAMAuthenticator('AGesgrUJa4L4OVBHpbJgTKfOeCU6kVeVxo2qhIVFqIYS')  #put the general watson api key here
+    # WATSON
+    WATSON_AUTH = IAMAuthenticator(
+        'AGesgrUJa4L4OVBHpbJgTKfOeCU6kVeVxo2qhIVFqIYS')  # put the general watson api key here
     WATSON_ASSISTANT = AssistantV2(
         version='2018-09-20',
         authenticator=WATSON_AUTH)
     WATSON_ASSISTANT.set_service_url(
         'https://api.us-south.assistant.watson.cloud.ibm.com/instances/28f6a127-f399-482b-9b66-5502ad5af6f5')
-    session = WATSON_ASSISTANT.create_session("82b5e8f6-5a1d-44a5-930e-a388332db998").get_result() #put the specific assistant api key
-    WATSON_KEY = session.get("session_id", "")    
-    #END WATSON
+    session = WATSON_ASSISTANT.create_session(
+        "9bf7bf36-235e-4089-bf1d-113791da5b43").get_result()  # put the specific assistant api key
+    WATSON_KEY = session.get("session_id", "")
+    # END WATSON
 
-#TTS
-def get_speech(transcript, reply):
-    #authenticator = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
-    #service = TextToSpeechV1(authenticator=authenticator)
-    #service.set_service_url(
-    #    'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/2a38c46e-2eb1-4376-8a09-a7c1713865a4')
+    # TONE ANALYZER
+    TONE_AUTHENTICATOR = IAMAuthenticator(
+        'b0DmzKxaFck7YymuFStEYpJPMmt_bbYLPu8fPO9aEend')
+    TONE_SERVICE = ToneAnalyzerV3(
+        version='2017-09-21',
+        authenticator=TONE_AUTHENTICATOR)
+    TONE_SERVICE.set_service_url(
+        'https://api.us-south.tone-analyzer.watson.cloud.ibm.com/instances/4a4d15eb-5212-447b-8da9-dcad6434130a')
+    # TONE ANALUZER
 
-    #voices = service.list_voices().get_result()
-    # print(json.dumps(voices, indent=2))
 
-    #watson api call
-    with open("D:\\dev\\IBM_Watson\\Integration\\resources\\test.wav",
-              'wb') as audio_file:
-        response = TTS_SERVICE.synthesize(
-            reply, accept='audio/wav',
-            voice="en-US_MichaelV3Voice").get_result()
-        audio_file.write(response.content)
-
-    #output via pyaudio
-    f = wave.open(r"D:\\dev\\IBM_Watson\\Integration\\resources\\test.wav", "rb")
-    
-    #p2 = pyaudio.PyAudio()
+def play_wav(path):
+    # output via pyaudio
+    f = wave.open(path, "rb")
 
     stream = PYAUDIO_OBJ.open(format=PYAUDIO_OBJ.get_format_from_width(f.getsampwidth()),
-                     channels=f.getnchannels(),
-                     rate=f.getframerate(),
-                     output=True)
+                              channels=f.getnchannels(),
+                              rate=f.getframerate(),
+                              output=True)
     # read data
     data = f.readframes(CHUNK)
-
     # play stream
     while data:
         stream.write(data)
@@ -146,97 +138,101 @@ def get_speech(transcript, reply):
     stream.stop_stream()
     stream.close()
 
-    # close PyAudio
-    #p2.terminate()
-    # pronunciation = service.get_pronunciation('Watson', format='spr').get_result()
-    # print(json.dumps(pronunciation, indent=2))
 
-#uses watson to get an answer for convo
-def get_answer(transcript):
-    #authenticator = IAMAuthenticator('AGesgrUJa4L4OVBHpbJgTKfOeCU6kVeVxo2qhIVFqIYS')  #put the general watson api key here
-    #assistant = AssistantV2(
-    #    version='2018-09-20',
-    #    authenticator=authenticator)
-    #assistant.set_service_url(
-    #    'https://api.us-south.assistant.watson.cloud.ibm.com/instances/28f6a127-f399-482b-9b66-5502ad5af6f5')
+# TTS
+def generate_wav(reply):
+    # authenticator = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
+    # service = TextToSpeechV1(authenticator=authenticator)
+    # service.set_service_url(
+    #    'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/2a38c46e-2eb1-4376-8a09-a7c1713865a4')
 
-    #########################
-    # Sessions
-    #########################
+    # voices = service.list_voices().get_result()
+    # print(json.dumps(voices, indent=2))
 
-    #session = assistant.create_session("82b5e8f6-5a1d-44a5-930e-a388332db998").get_result() #put the specific assistant api key
-    # print(json.dumps(session, indent=2))
-    #key = session.get("session_id", "")
+    # watson tts api call
+    with open(WAV_PATH,
+              'wb') as audio_file:
+        response = TTS_SERVICE.synthesize(
+            reply, accept='audio/wav',
+            voice="en-US_MichaelV3Voice").get_result()
+        audio_file.write(response.content)
 
-    # assistant.delete_session(
-    #    "478bd1ae-7f5a-40b5-b40c-98e1d28ffd99", session).get_result()
+    #play_wav(WAV_PATH)
 
-    #########################
-    # Message
-    #########################
 
-    ##put the specific assistant api key
-    message = json.dumps(WATSON_ASSISTANT.message(
-        "82b5e8f6-5a1d-44a5-930e-a388332db998", WATSON_KEY,
-        input={'text': transcript},
-        context={
-            'metadata': {
-                'deployment': 'myDeployment'
-            }
-        }).get_result())
-    # print(json.dumps(message, indent=2))
-    # reply = "".join(message.get('output').get('generic').get(0).get('text'))
-
-    parsed_message = json.loads(message)
-    reply = parsed_message['output']['generic'][0]['text']
-    intent = parsed_message['output']['intents'][0]['intent']
-
-    print("Intent: ", intent)
-    if (intent != 'Search'):   
-        print("Your question: ", transcript)
-        print("Reply: ", reply)
-
-        get_speech(transcript, reply)
+# uses watson to get an answer for conversation
+def generate_reply(transcript):
+    transcript = "hello how are you"
+    sarcastic_remark = sarcasm_module.sarcasm_detector(transcript)
+    if sarcastic_remark is not None:
+        print("Your Input: ", transcript)
+        print("Reply: ", sarcastic_remark)
+        reply = sarcastic_remark
+        tone = "Sarcastic"
+    # divert program flow to IBM watson if sarcasm not detected
     else:
-        # WE TRYNNA CONNECT TO GOOGLE HERE BITCH
-        #google api call
-        path = "D:\\dev\\IBM_Watson\\Integration\\textinput.py --device-id 6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d --device-model-id watson-73b2e-watsongoogle-famt7c"
-        #path.append(" --device-id 6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d --device-model-id watson-73b2e-watsongoogle-famt7c")
-        os.system(path)
+        message = json.dumps(WATSON_ASSISTANT.message(
+            "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
+            input={'text': transcript},
+            context={
+                'metadata': {
+                    'deployment': 'myDeployment'
+                }
+            }).get_result())
 
-#STT
+        parsed_message = json.loads(message)
+        reply = parsed_message['output']['generic'][0]['text']
+        intents = parsed_message['output']['intents']
+
+        # check if watson returned a valid reply
+        if len(intents) is not 0:
+            print("Your question: ", transcript)
+            print('Reply: ', reply)
+
+        # if watson does not understand, send google search call
+        else:
+            reply = google_search('embeddedassistant.googleapis.com',
+                                  'C:\\Users\\Wasiq\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json',
+                                  'watson-73b2e-watsongoogle-famt7c', '5debc6de-60a0-11ea-be7f-186024c1a96d',
+                                  'en-US', False, False, 185, transcript)
+
+        if reply is None:
+            reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
+            print('Reply: ', reply)
+
+        # determine the tone of the generated reply
+        tone = TONE_SERVICE.tone(
+            tone_input=reply, content_type="text/plain").get_result()
+        if tone['document_tone']['tones']:
+            arr = tone['document_tone']['tones']
+            new_list = sorted(arr, key=lambda k: k['score'], reverse=True)
+            # {k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
+            tone = new_list[0]['tone_name']
+        else:
+            tone = "Neutral"
+
+    print('Reply tone: ', tone)
+
+    return reply, tone
+
+
+# STT
 def read_audio(ws, timeout):
-    """Read audio and sent it to the websocket port.
-
-    This uses pyaudio to read from a device in chunks and send these
-    over the websocket wire.
-
-    """
     global RATE
-    #p = pyaudio.PyAudio()
-    # NOTE(sdague): if you don't seem to be getting anything off of
-    # this you might need to specify:
-    #
-    #    input_device_index=N,
-    #
-    # Where N is an int. You'll need to do a dump of your input
-    # devices to figure out which one you want.
+
     RATE = int(PYAUDIO_OBJ_INPUT.get_default_input_device_info()['defaultSampleRate'])
     stream = PYAUDIO_OBJ_INPUT.open(format=FORMAT,
-                    channels=CHANNELS,
-                    rate=RATE,
-                    input=True,
-                    frames_per_buffer=CHUNK)
+                                    channels=CHANNELS,
+                                    rate=RATE,
+                                    input=True,
+                                    frames_per_buffer=CHUNK)
 
     print("* Recording...")
     rec = RECORD_SECONDS or timeout
 
     for i in range(0, int(RATE / CHUNK * rec)):
         data = stream.read(CHUNK)
-        # print("Sending packet... %d" % i)
-        # NOTE(sdague): we're sending raw binary in the stream, we
-        # need to indicate that otherwise the stream service
-        # interprets this as text control messages.
+
         ws.send(data, ABNF.OPCODE_BINARY)
 
     # Disconnect the audio stream
@@ -253,43 +249,35 @@ def read_audio(ws, timeout):
     ws.close()
 
     # ... and kill the audio device
-    #p.terminate()
+    # p.terminate()
 
-#SST
+
+# SST
 def on_message(self, msg):
-    """Print whatever messages come in.
-
-    While we are processing any non trivial stream of speech Watson
-    will start chunking results into bits of transcripts that it
-    considers "final", and start on a new stretch. It's not always
-    clear why it does this. However, it means that as we are
-    processing text, any time we see a final chunk, we need to save it
-    off for later.
-    """
-
     data = json.loads(msg)
     if "results" in data:
         if data["results"][0]["final"]:
-            FINALS.clear()
-            FINALS.append(data)
+            STT.clear()
+            STT.append(data)
         # This prints out the current fragment that we are working on
         print(data['results'][0]['alternatives'][0]['transcript'])
 
-#SST
+
+# SST
 def on_error(self, error):
     """Print any errors."""
     print(error)
 
-#SST
+
+# SST
 def on_close(ws):
     """Upon close, print the complete and final transcript."""
-    transcript = "".join([x['results'][0]['alternatives'][0]['transcript']
-                          for x in FINALS])
-    # print("\nHere's the transcript:\n")
-    # print(transcript)
-    get_answer(transcript)
+    global TRANSCRIPT
+    TRANSCRIPT = "".join([x['results'][0]['alternatives'][0]['transcript']
+                          for x in STT])
 
-#SST
+
+# SST
 def on_open(ws):
     """Triggered as soon a we have an active connection."""
     args = ws.args
@@ -315,7 +303,8 @@ def on_open(ws):
     threading.Thread(target=read_audio,
                      args=(ws, args.timeout)).start()
 
-#SST
+
+# SST
 def get_url():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
@@ -327,14 +316,16 @@ def get_url():
     return ("wss://{}/speech-to-text/api/v1/recognize"
             "?model=en-US_BroadbandModel").format(host)
 
-#SST
+
+# SST
 def get_auth():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
     apikey = config.get('auth', 'apikey')
-    return ("apikey", apikey)
+    return "apikey", apikey
 
-#SST
+
+# SST
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Transcribe Watson text in real time')
@@ -344,39 +335,54 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
+def watson_loop(sst_socket, client_socket, event_signal):
+
+    while True:
+        event_signal.wait()
+
+        # call the STT service that will generate a transcript
+        sst_socket.run_forever()
+        reply, tone = generate_reply(TRANSCRIPT)
+        generate_wav(reply)
+
+        json_dict = {'reply': reply, 'tone': tone}
+        with open(JSON_PATH, 'w') as outfile:
+            json.dump(json_dict, outfile)
+
+        send_wav_data(WAV_PATH, client_socket, "Generated Reply .wav File")
+
+        send_data(JSON_PATH, client_socket, "Generated Reply and Tone")
+
+        event_signal.clear()
+
+
+def init_NLP():
+    # establishing connection
+    SERVER = "196.194.239.152"
+    PORT = 10005
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((SERVER, PORT))
+    return client
+
+
 def main():
-   
-    # Connect to websocket interfaces
-    #headers = {}
-    #userpass = ":".join(get_auth())
-    #headers["Authorization"] = "Basic " + base64.b64encode(
-    #    userpass.encode()).decode()
-    #url = get_url()
-
-    # If you really want to see everything going across the wire,
-    # uncomment this. However realize the trace is going to also do
-    # things like dump the binary sound packets in text in the
-    # console.
-    #
-    # websocket.enableTrace(True)
-    
     authentication_function()
+    client = init_NLP()
+    ws = websocket.WebSocketApp(URL, header=HEADERS, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open)
+    ws.args = parse_args()
 
-    while (True):
-        ws = websocket.WebSocketApp(URL,
-                                    header=HEADERS,
-                                    on_message=on_message,
-                                    on_error=on_error,
-                                    on_close=on_close)
-        ws.on_open = on_open
-        ws.args = parse_args()
-        # This gives control over the WebSocketApp. This is a blocking
-        # call, so it won't return until the ws.close() gets called (after
-        # 6 seconds in the dedicated thread).
-        ws.run_forever()
+    anim_signal = Event()
+    work = Thread(target=watson_loop, args=(ws, client, anim_signal))
+    work.start()
+    
+    while True:
+
+        data = client.recv(1025)
+        blender_input = data.decode()
+        if blender_input.upper() == "START":
+            anim_signal.set()
 
 
 if __name__ == "__main__":
-    #while(True):
-    #    main()
     main()
