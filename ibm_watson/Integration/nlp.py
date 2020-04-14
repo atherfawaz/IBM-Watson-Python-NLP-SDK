@@ -18,23 +18,23 @@ import argparse
 import base64
 import configparser
 import json
+import socket
 import threading
 import time
 import wave
-import socket
 from threading import Thread, Event
 
 import pyaudio
 import websocket
-from ibm_watson.Networking.client import send_data, send_wav_data, send_message
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from websocket import ABNF
 
 import ibm_watson.Integration.Sarcasm.classifier as sarcasm_module
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson import AssistantV2
 from ibm_watson import TextToSpeechV1
 from ibm_watson import ToneAnalyzerV3
 from ibm_watson.Integration.textinput import google_search
+from ibm_watson.Networking.client import send_data, send_wav_data, flag_check
 
 REGION_MAP = {
     'us-east': 'gateway-wdc.watsonplatform.net',
@@ -45,6 +45,22 @@ REGION_MAP = {
     'jp-tok': 'gateway-syd.watsonplatform.net',
 }
 
+
+def init_NLP():
+    # establishing connection
+    SERVER = "196.194.235.248"
+    PORT = 10005
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((SERVER, PORT))
+
+    client.sendall(bytes('NLP', 'UTF-8'))
+    status = client.recv(1024)
+    print(status.decode())
+
+    return client
+
+
+CLIENT = init_NLP()
 # GLOBALS
 TTS_AUTH = None
 TTS_SERVICE = None
@@ -61,12 +77,15 @@ CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
-RECORD_SECONDS = 5
+RECORD_SECONDS = 10
 STT = []
 TRANSCRIPT = None
 WAV_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\output.wav"
 JSON_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\data.json"
+
+
 # GLOBALS
+
 
 # sets up the variables
 def authentication_function():
@@ -116,7 +135,7 @@ def authentication_function():
         authenticator=TONE_AUTHENTICATOR)
     TONE_SERVICE.set_service_url(
         'https://api.us-south.tone-analyzer.watson.cloud.ibm.com/instances/4a4d15eb-5212-447b-8da9-dcad6434130a')
-    # TONE ANALUZER
+    # TONE ANALYZER
 
 
 def play_wav(path):
@@ -157,7 +176,7 @@ def generate_wav(reply):
             voice="en-US_MichaelV3Voice").get_result()
         audio_file.write(response.content)
 
-    #play_wav(WAV_PATH)
+    # play_wav(WAV_PATH)
 
 
 # uses watson to get an answer for conversation
@@ -220,6 +239,11 @@ def generate_reply(transcript):
 def read_audio(ws, timeout):
     global RATE
 
+    # signal blender to switch to listening state
+    listening_state = 1
+    CLIENT.sendall(bytes('Update_State', 'UTF-8'))
+    CLIENT.sendall((listening_state.to_bytes(2, byteorder='big')))
+
     RATE = int(PYAUDIO_OBJ_INPUT.get_default_input_device_info()['defaultSampleRate'])
     stream = PYAUDIO_OBJ_INPUT.open(format=FORMAT,
                                     channels=CHANNELS,
@@ -239,6 +263,11 @@ def read_audio(ws, timeout):
     stream.stop_stream()
     stream.close()
     print("* Recording ended.")
+
+    # signal blender to switch to thinking state
+    thinking_state = 2
+    CLIENT.sendall(bytes('Update_State', 'UTF-8'))
+    CLIENT.sendall((thinking_state.to_bytes(2, byteorder='big')))
 
     # In order to get a final response from STT we send a stop, this
     # will force a final=True return message.
@@ -337,51 +366,64 @@ def parse_args():
 
 
 def watson_loop(sst_socket, client_socket, event_signal):
-
     while True:
         event_signal.wait()
 
         # call the STT service that will generate a transcript
+
         sst_socket.run_forever()
         reply, tone = generate_reply(TRANSCRIPT)
-        generate_wav(reply)
 
         json_dict = {'reply': reply, 'tone': tone}
         with open(JSON_PATH, 'w') as outfile:
             json.dump(json_dict, outfile)
 
-        send_wav_data(WAV_PATH, client_socket, "Generated Reply .wav File")
+        generate_wav(reply)
 
-        send_data(JSON_PATH, client_socket, "Generated Reply and Tone")
+        send_wav_data(WAV_PATH, client_socket, "SEND_WAV")
+
+        send_data(JSON_PATH, client_socket, "SEND_JSON")
+        # signal blender to switch to speaking state
+        speaking_state = 3
+        CLIENT.sendall(bytes('Update_State', 'UTF-8'))
+        CLIENT.sendall((speaking_state.to_bytes(2, byteorder='big')))
 
         event_signal.clear()
 
 
-def init_NLP():
-    # establishing connection
-    SERVER = "196.194.239.152"
-    PORT = 10005
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((SERVER, PORT))
-    return client
-
-
 def main():
     authentication_function()
-    client = init_NLP()
-    ws = websocket.WebSocketApp(URL, header=HEADERS, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open)
+    ws = websocket.WebSocketApp(URL, header=HEADERS, on_message=on_message, on_error=on_error, on_close=on_close,
+                                on_open=on_open)
     ws.args = parse_args()
 
     anim_signal = Event()
-    work = Thread(target=watson_loop, args=(ws, client, anim_signal))
+    work = Thread(target=watson_loop, args=(ws, CLIENT, anim_signal))
     work.start()
-    
+
     while True:
 
-        data = client.recv(1025)
-        blender_input = data.decode()
-        if blender_input.upper() == "START":
-            anim_signal.set()
+        cv_signal = Event()
+        cv_input = Thread(target=flag_check, args=(cv_signal,))
+
+        cv_input.start()
+
+        while True:
+            server_input = CLIENT.recv(1025)
+
+            server_input = server_input.decode()
+            print(server_input)
+            if 'UPDATE_STATE' in server_input.upper():
+                data = CLIENT.recv(1025)
+                decoded = data.decode()
+                if 'START' in decoded.upper():
+                    anim_signal.set()
+            elif 'CV_INPUT' in server_input.upper():
+                posture_input = CLIENT.recv(1025)
+                posture_input = posture_input.decode()
+                print(posture_input)
+                time_input = time
+                cv_signal.set()
 
 
 if __name__ == "__main__":
