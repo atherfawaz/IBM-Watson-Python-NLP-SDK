@@ -34,7 +34,7 @@ from ibm_watson import AssistantV2
 from ibm_watson import TextToSpeechV1
 from ibm_watson import ToneAnalyzerV3
 from ibm_watson.Integration.textinput import google_search
-from ibm_watson.Networking.client import send_data, send_wav_data, flag_check
+from ibm_watson.Networking.client import send_data, send_wav_data
 
 REGION_MAP = {
     'us-east': 'gateway-wdc.watsonplatform.net',
@@ -48,10 +48,10 @@ REGION_MAP = {
 
 def init_NLP():
     # establishing connection
-    SERVER = "196.194.235.248"
-    PORT = 10005
+    server = "127.0.0.1"
+    port = 10005
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((SERVER, PORT))
+    client.connect((server, port))
 
     client.sendall(bytes('NLP', 'UTF-8'))
     status = client.recv(1024)
@@ -82,9 +82,23 @@ STT = []
 TRANSCRIPT = None
 WAV_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\output.wav"
 JSON_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\data.json"
-
-
+time_input = 0
+flag_gesture_input = False  # use this flag to identify if there was an input from CV in past duration
 # GLOBALS
+
+
+def flag_check(event):
+    global time_input
+    global flag_gesture_input
+    duration = 1.0
+    while True:
+        event.wait()
+        flag_gesture_input = True
+        while flag_gesture_input:
+            current_time = time.time()
+            if current_time - time_input > duration:
+                flag_gesture_input = False
+        event.clear()
 
 
 # sets up the variables
@@ -128,11 +142,11 @@ def authentication_function():
     # END WATSON
 
     # TONE ANALYZER
-    TONE_AUTHENTICATOR = IAMAuthenticator(
+    tone_authenticator = IAMAuthenticator(
         'b0DmzKxaFck7YymuFStEYpJPMmt_bbYLPu8fPO9aEend')
     TONE_SERVICE = ToneAnalyzerV3(
         version='2017-09-21',
-        authenticator=TONE_AUTHENTICATOR)
+        authenticator=tone_authenticator)
     TONE_SERVICE.set_service_url(
         'https://api.us-south.tone-analyzer.watson.cloud.ibm.com/instances/4a4d15eb-5212-447b-8da9-dcad6434130a')
     # TONE ANALYZER
@@ -181,15 +195,14 @@ def generate_wav(reply):
 
 # uses watson to get an answer for conversation
 def generate_reply(transcript):
-    transcript = "hello how are you"
-    sarcastic_remark = sarcasm_module.sarcasm_detector(transcript)
-    if sarcastic_remark is not None:
-        print("Your Input: ", transcript)
-        print("Reply: ", sarcastic_remark)
-        reply = sarcastic_remark
-        tone = "Sarcastic"
+
+    transcript = "How are you?"
     # divert program flow to IBM watson if sarcasm not detected
-    else:
+    reply = google_search('embeddedassistant.googleapis.com',
+                              'C:\\Users\\Wasiq\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json',
+                              'watson-73b2e-watsongoogle-famt7c', '5debc6de-60a0-11ea-be7f-186024c1a96d',
+                              'en-US', False, False, 185, transcript)
+    if reply is None:
         message = json.dumps(WATSON_ASSISTANT.message(
             "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
             input={'text': transcript},
@@ -207,28 +220,29 @@ def generate_reply(transcript):
         if len(intents) is not 0:
             print("Your question: ", transcript)
             print('Reply: ', reply)
-
-        # if watson does not understand, send google search call
         else:
-            reply = google_search('embeddedassistant.googleapis.com',
-                                  'C:\\Users\\Wasiq\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json',
-                                  'watson-73b2e-watsongoogle-famt7c', '5debc6de-60a0-11ea-be7f-186024c1a96d',
-                                  'en-US', False, False, 185, transcript)
+            # if watson does not understand, send google search call
+            sarcastic_remark = sarcasm_module.sarcasm_detector(transcript)
+            if sarcastic_remark is not None:
+                print("Your Input: ", transcript)
+                print("Reply: ", sarcastic_remark)
+                reply = sarcastic_remark
+                tone = "Sarcastic"
 
-        if reply is None:
-            reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
-            print('Reply: ', reply)
+    if reply is None:
+        reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
+        print('Reply: ', reply)
 
-        # determine the tone of the generated reply
-        tone = TONE_SERVICE.tone(
-            tone_input=reply, content_type="text/plain").get_result()
-        if tone['document_tone']['tones']:
-            arr = tone['document_tone']['tones']
-            new_list = sorted(arr, key=lambda k: k['score'], reverse=True)
-            # {k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
-            tone = new_list[0]['tone_name']
-        else:
-            tone = "Neutral"
+    # determine the tone of the generated reply
+    tone = TONE_SERVICE.tone(
+        tone_input=reply, content_type="text/plain").get_result()
+    if tone['document_tone']['tones']:
+        arr = tone['document_tone']['tones']
+        new_list = sorted(arr, key=lambda k: k['score'], reverse=True)
+        # {k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
+        tone = new_list[0]['tone_name']
+    else:
+        tone = "Neutral"
 
     print('Reply tone: ', tone)
 
@@ -378,11 +392,12 @@ def watson_loop(sst_socket, client_socket, event_signal):
         with open(JSON_PATH, 'w') as outfile:
             json.dump(json_dict, outfile)
 
+        send_data(JSON_PATH, client_socket, "SEND_JSON")
+
         generate_wav(reply)
 
         send_wav_data(WAV_PATH, client_socket, "SEND_WAV")
 
-        send_data(JSON_PATH, client_socket, "SEND_JSON")
         # signal blender to switch to speaking state
         speaking_state = 3
         CLIENT.sendall(bytes('Update_State', 'UTF-8'))
@@ -422,7 +437,7 @@ def main():
                 posture_input = CLIENT.recv(1025)
                 posture_input = posture_input.decode()
                 print(posture_input)
-                time_input = time
+                time_input = time.time()
                 cv_signal.set()
 
 

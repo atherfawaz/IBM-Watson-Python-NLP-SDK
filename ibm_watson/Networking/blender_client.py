@@ -45,6 +45,7 @@ def client_receive(client, clientinput):
     print("state from client", state)
     # sending message to server that transmission was successful
     client.send(bytes(msg, 'UTF-8'))
+
     return data, state
 
 

@@ -40,6 +40,8 @@ def send_wav_data(wavfilename, client, clientinput):
     counter = 0
     # loading and sending from wav file
     client.sendall(file_size_b)
+    size_ack = client.recv(1024)
+    print("From Server :", size_ack.decode())
     # client.sendall(int(size).to_bytes(2, byteorder='big'))
     with open(wavfilename, 'rb') as f:
         for l in f:
@@ -51,9 +53,8 @@ def send_wav_data(wavfilename, client, clientinput):
     client.sendall(bytes('end', 'UTF-8'))  # this is the termination bytes
     print(".wav Sent")
 
-
-in_data = client.recv(1024)
-print("From Server :", in_data.decode())
+    in_data = client.recv(1024)
+    print("From Server :", in_data.decode())
 
 
 def client_receive(client, clientinput):
@@ -74,18 +75,7 @@ def send_message(client, input_msg):
     client.sendall(bytes(input_msg, 'UTF-8'))
 
 
-def flag_check(event):
-    global time_input
-    global flag_gesture_input
-    duration = 1.0
-    while True:
-        event_is_set = event.wait()
-        flag_gesture_input = True
-        while flag_gesture_input:
-            current_time = time()
-            if current_time - time_input > duration:
-                flag_gesture_input = False
-        event.clear()
+
 
 
 def main_job(e):
