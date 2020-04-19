@@ -266,8 +266,6 @@ def authentication_function():
     # TONE ANALUZER
 
 # TTS
-
-
 def get_speech(transcript, reply):
 
     # watson api call
@@ -304,17 +302,18 @@ general_questions = ['Who are you?', 'What is the weather today?', 'What is the 
              'I want to drop my course with 17L-4051 and CS123', 'my attendance does not reach the 80% mark', 'Kindly transfer weightage of my course']
 specific_questions = ['I want to drop a course', '17L-4004', 'CS 410', 'I want to drop a course', '17L-4004', 'CS 410']
 weird_questions = ['Where is the statue of liberty?', 'Coffee places nearby']
-counter = 0
+counter = -1
 
 
 def get_answer(transcript):
     global counter
-    transcript = weird_questions[counter]
+
     counter += 1
     if (counter > len(weird_questions)):
         print("TEST QUESTIONS COMPLETE")
         counter = 0
 
+    transcript = weird_questions[counter]
     
     # GOOGLE
     api_key = 'embeddedassistant.googleapis.com'
@@ -359,7 +358,6 @@ def get_answer(transcript):
     else:
         tone = "Neutral"
     print('Reply tone: ', tone)
-    #TONE ANALYSIS
 
 
 # STT
