@@ -44,6 +44,7 @@ import googlesamples.assistant.grpc.assistant_helpers as assistant_helpers
 import googlesamples.assistant.grpc.browser_helpers as browser_helpers
 from ibm_watson import ToneAnalyzerV3
 from ibm_watson.tone_analyzer_v3 import ToneInput
+import emoji
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
@@ -302,6 +303,7 @@ general_questions = ['Who are you?', 'What is the weather today?', 'What is the 
              'I want to drop my course with 17L-4051 and CS123', 'my attendance does not reach the 80% mark', 'Kindly transfer weightage of my course']
 specific_questions = ['I want to drop a course', '17L-4004', 'CS 410', 'I want to drop a course', '17L-4004', 'CS 410']
 weird_questions = ['Where is the statue of liberty?', 'Coffee places nearby']
+joke_questions = ['Tell me a joke']
 counter = -1
 
 
@@ -309,11 +311,11 @@ def get_answer(transcript):
     global counter
 
     counter += 1
-    if (counter > len(weird_questions)):
+    if (counter > len(joke_questions)):
         print("TEST QUESTIONS COMPLETE")
         counter = 0
 
-    transcript = weird_questions[counter]
+    transcript = joke_questions[counter]
     
     # GOOGLE
     api_key = 'embeddedassistant.googleapis.com'
@@ -327,7 +329,7 @@ def get_answer(transcript):
     reply = GoogleAPI(api_key, credentials, device_model_id,
                       device_id, lang, display, verbose, grpc, transcript)
 
-    #IBM
+    # IBM
     if reply is None:
         message = json.dumps(WATSON_ASSISTANT.message(
             "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
@@ -340,15 +342,29 @@ def get_answer(transcript):
         parsed_message = json.loads(message)
         reply = parsed_message['output']['generic'][0]['text']
         intents = parsed_message['output']['intents']
+
+        #Answer received
         if len(intents) is not 0:
             print("Your question: ", transcript)
             print('Reply: ', reply)
+        
+        #no answer from ibm or google
         else:
             reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
             print("Your question: ", transcript)
             print("Reply: ", reply)
-        
-    #TONE ANALYSIS
+    
+    #temp = demoji.replace(reply, " ")
+    #print(temp)
+
+    reply = emoji.demojize(reply)
+    """ this will replace your emoji with :emoji_name:, 
+        which should be removed by the dictionary lookup
+    """
+    
+
+
+    # TONE ANALYSIS
     tone = TONE_SERVICE.tone(
         tone_input=reply, content_type="text/plain").get_result()
     if(tone['document_tone']['tones']):
