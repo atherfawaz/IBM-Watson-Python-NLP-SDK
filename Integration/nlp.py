@@ -56,7 +56,7 @@ CHANNELS = 1
 # standard default. If you have an audio device that requires
 # something different, change this.
 RATE = 44100
-RECORD_SECONDS = 5
+RECORD_SECONDS = 1
 FINALS = []
 WATSON_INTENTS = {'attendance', 'availability', 'drop_course',
                   'Goodbye', 'Greeting', 'marks', 'mood', 'printfee', 'reg_course'}
@@ -266,6 +266,8 @@ def authentication_function():
     # TONE ANALUZER
 
 # TTS
+
+
 def get_speech(transcript, reply):
 
     # watson api call
@@ -298,59 +300,66 @@ def get_speech(transcript, reply):
     stream.stop_stream()
     stream.close()
 
+general_questions = ['Who are you?', 'What is the weather today?', 'What is the time of registration?', 'When will registration start?', 'i want a retake of my exam for this course',
+             'I want to drop my course with 17L-4051 and CS123', 'my attendance does not reach the 80% mark', 'Kindly transfer weightage of my course']
+specific_questions = ['I want to drop a course', '17L-4004', 'CS 410', 'I want to drop a course', '17L-4004', 'CS 410']
+weird_questions = ['Where is the statue of liberty?', 'Coffee places nearby']
+counter = 0
+
 
 def get_answer(transcript):
-    # put the specific assistant api key
-    message = json.dumps(WATSON_ASSISTANT.message(
-        "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
-        input={'text': transcript},
-        context={
-            'metadata': {
-                'deployment': 'myDeployment'
-            }
-        }).get_result())
-    # print(json.dumps(message, indent=2))
-    #reply = "".join(message.get('output').get('generic').get(0).get('text'))
-    parsed_message = json.loads(message)
-    reply = parsed_message['output']['generic'][0]['text']
-    error = "I didn't understand. You can try rephrasing."
-    if (reply != error):
-        # if (intent in WATSON_INTENTS):
-        # if (transcript.find('Google') == -1 and transcript.find('google') == -1):
-        # if (intent != 'Search'):
-        print("Your question: ", transcript)
-        print("Reply: ", reply)
-        #get_speech(transcript, reply)
-    else:
-        api_key = 'embeddedassistant.googleapis.com'
-        credentials = 'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
-        device_id = '6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d'
-        device_model_id = 'watson-73b2e-watsongoogle-famt7c'
-        lang = 'en-US'
-        display = False
-        verbose = False
-        grpc = 185
-        reply = GoogleAPI(api_key, credentials, device_model_id,
-                          device_id, lang, display, verbose, grpc, transcript)
-        if (reply is None):
+    global counter
+    transcript = weird_questions[counter]
+    counter += 1
+    if (counter > len(weird_questions)):
+        print("TEST QUESTIONS COMPLETE")
+        counter = 0
+
+    
+    # GOOGLE
+    api_key = 'embeddedassistant.googleapis.com'
+    credentials = 'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
+    device_id = '6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d'
+    device_model_id = 'watson-73b2e-watsongoogle-famt7c'
+    lang = 'en-US'
+    display = False
+    verbose = False
+    grpc = 185
+    reply = GoogleAPI(api_key, credentials, device_model_id,
+                      device_id, lang, display, verbose, grpc, transcript)
+
+    #IBM
+    if reply is None:
+        message = json.dumps(WATSON_ASSISTANT.message(
+            "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
+            input={'text': transcript},
+            context={
+                'metadata': {
+                    'deployment': 'myDeployment'
+                }
+            }).get_result())
+        parsed_message = json.loads(message)
+        reply = parsed_message['output']['generic'][0]['text']
+        intents = parsed_message['output']['intents']
+        if len(intents) is not 0:
+            print("Your question: ", transcript)
+            print('Reply: ', reply)
+        else:
             reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
             print("Your question: ", transcript)
             print("Reply: ", reply)
-            #get_speech(transcript, reply)
-        else:
-            #get_speech(transcript, reply)
-            dummy = None
-
+        
+    #TONE ANALYSIS
     tone = TONE_SERVICE.tone(
         tone_input=reply, content_type="text/plain").get_result()
     if(tone['document_tone']['tones']):
         arr = tone['document_tone']['tones']
         newlist = sorted(arr, key=lambda k: k['score'], reverse=True)
-        #{k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
         tone = newlist[0]['tone_name']
     else:
         tone = "Neutral"
     print('Reply tone: ', tone)
+    #TONE ANALYSIS
 
 
 # STT
@@ -406,6 +415,8 @@ def read_audio(ws, timeout):
     # p.terminate()
 
 # SST
+
+
 def on_message(self, msg):
     """Print whatever messages come in.
 
@@ -426,11 +437,15 @@ def on_message(self, msg):
         print(data['results'][0]['alternatives'][0]['transcript'])
 
 # SST
+
+
 def on_error(self, error):
     """Print any errors."""
     print(error)
 
 # SST
+
+
 def on_close(ws):
     """Upon close, print the complete and final transcript."""
     transcript = "".join([x['results'][0]['alternatives'][0]['transcript']
@@ -440,6 +455,8 @@ def on_close(ws):
     get_answer(transcript)
 
 # SST
+
+
 def on_open(ws):
     """Triggered as soon a we have an active connection."""
     args = ws.args
@@ -466,6 +483,8 @@ def on_open(ws):
                      args=(ws, args.timeout)).start()
 
 # SST
+
+
 def get_url():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
@@ -478,6 +497,8 @@ def get_url():
             "?model=en-US_BroadbandModel").format(host)
 
 # SST
+
+
 def get_auth():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
@@ -485,6 +506,8 @@ def get_auth():
     return ("apikey", apikey)
 
 # SST
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Transcribe Watson text in real time')
