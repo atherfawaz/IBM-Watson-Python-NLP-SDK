@@ -22,7 +22,6 @@ import socket
 import threading
 import time
 import wave
-from threading import Thread, Event
 
 import pyaudio
 import websocket
@@ -34,7 +33,6 @@ from ibm_watson import AssistantV2
 from ibm_watson import TextToSpeechV1
 from ibm_watson import ToneAnalyzerV3
 from ibm_watson.Integration.textinput import google_search
-from ibm_watson.Networking.client import send_data, send_wav_data
 
 REGION_MAP = {
     'us-east': 'gateway-wdc.watsonplatform.net',
@@ -48,7 +46,7 @@ REGION_MAP = {
 
 def init_NLP():
     # establishing connection
-    server = "127.0.0.1"
+    server = "196.194.235.248"
     port = 10005
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect((server, port))
@@ -60,7 +58,8 @@ def init_NLP():
     return client
 
 
-CLIENT = init_NLP()
+# CLIENT = init_NLP()
+CLIENT = None
 # GLOBALS
 TTS_AUTH = None
 TTS_SERVICE = None
@@ -82,8 +81,11 @@ STT = []
 TRANSCRIPT = None
 WAV_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\output.wav"
 JSON_PATH = "C:\\Users\\Wasiq\\PycharmProjects\\ibmwatson_python_sdk\\ibm_watson\\Networking\\data.json"
+CV_INTERRUPT = False
 time_input = 0
 flag_gesture_input = False  # use this flag to identify if there was an input from CV in past duration
+
+
 # GLOBALS
 
 
@@ -114,10 +116,10 @@ def authentication_function():
     global TONE_SERVICE
 
     # TTS
-    TTS_AUTH = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
+    TTS_AUTH = IAMAuthenticator('4CUYHU_68pReHO4xyfisGiuH7fQmXanfbgf4OR94gp2l')
     TTS_SERVICE = TextToSpeechV1(authenticator=TTS_AUTH)
     TTS_SERVICE.set_service_url(
-        'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/2a38c46e-2eb1-4376-8a09-a7c1713865a4')
+        'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/806b8f05-e01e-4b2b-8d83-194205e7733b')
     # END TTS
 
     # STT
@@ -195,54 +197,54 @@ def generate_wav(reply):
 
 # uses watson to get an answer for conversation
 def generate_reply(transcript):
-
-    transcript = "How are you?"
+    transcript = "Do you have a liver?"
     # divert program flow to IBM watson if sarcasm not detected
-    reply = google_search('embeddedassistant.googleapis.com',
+
+    message = json.dumps(WATSON_ASSISTANT.message(
+        "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
+        input={'text': transcript},
+        context={
+            'metadata': {
+                'deployment': 'myDeployment'
+            }
+        }).get_result())
+
+    parsed_message = json.loads(message)
+    reply = parsed_message['output']['generic'][0]['text']
+    intents = parsed_message['output']['intents']
+
+    # check if watson returned a valid reply
+    if len(intents) is not 0:
+        print("Your question: ", transcript)
+        print('Reply: ', reply)
+    else:
+        reply = google_search('embeddedassistant.googleapis.com',
                               'C:\\Users\\Wasiq\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json',
                               'watson-73b2e-watsongoogle-famt7c', '5debc6de-60a0-11ea-be7f-186024c1a96d',
                               'en-US', False, False, 185, transcript)
+
     if reply is None:
-        message = json.dumps(WATSON_ASSISTANT.message(
-            "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
-            input={'text': transcript},
-            context={
-                'metadata': {
-                    'deployment': 'myDeployment'
-                }
-            }).get_result())
-
-        parsed_message = json.loads(message)
-        reply = parsed_message['output']['generic'][0]['text']
-        intents = parsed_message['output']['intents']
-
-        # check if watson returned a valid reply
-        if len(intents) is not 0:
-            print("Your question: ", transcript)
-            print('Reply: ', reply)
+        sarcastic_remark = sarcasm_module.sarcasm_detector(transcript)
+        if sarcastic_remark is not None:
+            print("Your Input: ", transcript)
+            print("Reply: ", sarcastic_remark)
+            reply = sarcastic_remark
+            tone = "Sarcastic"
+    else:
+        # determine the tone of the generated reply
+        tone = TONE_SERVICE.tone(
+            tone_input=reply, content_type="text/plain").get_result()
+        if tone['document_tone']['tones']:
+            arr = tone['document_tone']['tones']
+            new_list = sorted(arr, key=lambda k: k['score'], reverse=True)
+            # {k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
+            tone = new_list[0]['tone_name']
         else:
-            # if watson does not understand, send google search call
-            sarcastic_remark = sarcasm_module.sarcasm_detector(transcript)
-            if sarcastic_remark is not None:
-                print("Your Input: ", transcript)
-                print("Reply: ", sarcastic_remark)
-                reply = sarcastic_remark
-                tone = "Sarcastic"
+            tone = "Neutral"
 
     if reply is None:
         reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
         print('Reply: ', reply)
-
-    # determine the tone of the generated reply
-    tone = TONE_SERVICE.tone(
-        tone_input=reply, content_type="text/plain").get_result()
-    if tone['document_tone']['tones']:
-        arr = tone['document_tone']['tones']
-        new_list = sorted(arr, key=lambda k: k['score'], reverse=True)
-        # {k: v for k, v in sorted(arr.items(), key=lambda item:['score'])}
-        tone = new_list[0]['tone_name']
-    else:
-        tone = "Neutral"
 
     print('Reply tone: ', tone)
 
@@ -254,9 +256,9 @@ def read_audio(ws, timeout):
     global RATE
 
     # signal blender to switch to listening state
-    listening_state = 1
-    CLIENT.sendall(bytes('Update_State', 'UTF-8'))
-    CLIENT.sendall((listening_state.to_bytes(2, byteorder='big')))
+    # listening_state = 1
+    # CLIENT.sendall(bytes('Update_State', 'UTF-8'))
+    # CLIENT.sendall((listening_state.to_bytes(2, byteorder='big')))
 
     RATE = int(PYAUDIO_OBJ_INPUT.get_default_input_device_info()['defaultSampleRate'])
     stream = PYAUDIO_OBJ_INPUT.open(format=FORMAT,
@@ -279,9 +281,9 @@ def read_audio(ws, timeout):
     print("* Recording ended.")
 
     # signal blender to switch to thinking state
-    thinking_state = 2
-    CLIENT.sendall(bytes('Update_State', 'UTF-8'))
-    CLIENT.sendall((thinking_state.to_bytes(2, byteorder='big')))
+    # thinking_state = 2
+    # CLIENT.sendall(bytes('Update_State', 'UTF-8'))
+    # CLIENT.sendall((thinking_state.to_bytes(2, byteorder='big')))
 
     # In order to get a final response from STT we send a stop, this
     # will force a final=True return message.
@@ -316,8 +318,13 @@ def on_error(self, error):
 def on_close(ws):
     """Upon close, print the complete and final transcript."""
     global TRANSCRIPT
-    TRANSCRIPT = "".join([x['results'][0]['alternatives'][0]['transcript']
-                          for x in STT])
+    global STT
+    """Upon close, print the complete and final transcript."""
+    if STT:
+        TRANSCRIPT = "".join([i['results'][0]['alternatives'][0]['transcript'] for i in STT])
+    else:
+        TRANSCRIPT = ""
+    STT = []
 
 
 # SST
@@ -352,7 +359,6 @@ def get_url():
     config = configparser.RawConfigParser()
     config.read('speech.cfg')
     # See
-    # https://console.bluemix.net/docs/services/speech-to-text/websockets.html#websockets
     # for details on which endpoints are for each region.
     region = config.get('auth', 'region')
     host = REGION_MAP[region]
@@ -379,31 +385,19 @@ def parse_args():
     return args
 
 
-def watson_loop(sst_socket, client_socket, event_signal):
+def watson_loop(sst_socket):
     while True:
-        event_signal.wait()
-
         # call the STT service that will generate a transcript
 
         sst_socket.run_forever()
+
         reply, tone = generate_reply(TRANSCRIPT)
 
         json_dict = {'reply': reply, 'tone': tone}
         with open(JSON_PATH, 'w') as outfile:
             json.dump(json_dict, outfile)
 
-        send_data(JSON_PATH, client_socket, "SEND_JSON")
-
         generate_wav(reply)
-
-        send_wav_data(WAV_PATH, client_socket, "SEND_WAV")
-
-        # signal blender to switch to speaking state
-        speaking_state = 3
-        CLIENT.sendall(bytes('Update_State', 'UTF-8'))
-        CLIENT.sendall((speaking_state.to_bytes(2, byteorder='big')))
-
-        event_signal.clear()
 
 
 def main():
@@ -412,33 +406,8 @@ def main():
                                 on_open=on_open)
     ws.args = parse_args()
 
-    anim_signal = Event()
-    work = Thread(target=watson_loop, args=(ws, CLIENT, anim_signal))
-    work.start()
-
     while True:
-
-        cv_signal = Event()
-        cv_input = Thread(target=flag_check, args=(cv_signal,))
-
-        cv_input.start()
-
-        while True:
-            server_input = CLIENT.recv(1025)
-
-            server_input = server_input.decode()
-            print(server_input)
-            if 'UPDATE_STATE' in server_input.upper():
-                data = CLIENT.recv(1025)
-                decoded = data.decode()
-                if 'START' in decoded.upper():
-                    anim_signal.set()
-            elif 'CV_INPUT' in server_input.upper():
-                posture_input = CLIENT.recv(1025)
-                posture_input = posture_input.decode()
-                print(posture_input)
-                time_input = time.time()
-                cv_signal.set()
+        watson_loop(ws)
 
 
 if __name__ == "__main__":
