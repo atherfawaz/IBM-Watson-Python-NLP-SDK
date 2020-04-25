@@ -57,7 +57,7 @@ CHANNELS = 1
 # standard default. If you have an audio device that requires
 # something different, change this.
 RATE = 44100
-RECORD_SECONDS = 1
+RECORD_SECONDS = 5
 FINALS = []
 WATSON_INTENTS = {'attendance', 'availability', 'drop_course',
                   'Goodbye', 'Greeting', 'marks', 'mood', 'printfee', 'reg_course'}
@@ -224,10 +224,10 @@ def authentication_function():
     global TONE_SERVICE
 
     # TTS
-    TTS_AUTH = IAMAuthenticator('gV332Uci-w4LVq6fturapl2P88gE50SFtGBG9wjWelYq')
+    TTS_AUTH = IAMAuthenticator('4CUYHU_68pReHO4xyfisGiuH7fQmXanfbgf4OR94gp2l')
     TTS_SERVICE = TextToSpeechV1(authenticator=TTS_AUTH)
     TTS_SERVICE.set_service_url(
-        'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/2a38c46e-2eb1-4376-8a09-a7c1713865a4')
+        'https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/806b8f05-e01e-4b2b-8d83-194205e7733b')
     # END TTS
 
     # STT
@@ -267,6 +267,8 @@ def authentication_function():
     # TONE ANALUZER
 
 # TTS
+
+
 def get_speech(transcript, reply):
 
     # watson api call
@@ -274,7 +276,7 @@ def get_speech(transcript, reply):
               'wb') as audio_file:
         response = TTS_SERVICE.synthesize(
             reply, accept='audio/wav',
-            voice="en-US_MichaelV3Voice").get_result()
+            voice="en-US_KevinV3Voice").get_result()
         audio_file.write(response.content)
 
     # output via pyaudio
@@ -299,9 +301,11 @@ def get_speech(transcript, reply):
     stream.stop_stream()
     stream.close()
 
+
 general_questions = ['Who are you?', 'What is the weather today?', 'What is the time of registration?', 'When will registration start?', 'i want a retake of my exam for this course',
-             'I want to drop my course with 17L-4051 and CS123', 'my attendance does not reach the 80% mark', 'Kindly transfer weightage of my course']
-specific_questions = ['I want to drop a course', '17L-4004', 'CS 410', 'I want to drop a course', '17L-4004', 'CS 410']
+                     'I want to drop my course with 17L-4051 and CS123', 'my attendance does not reach the 80% mark', 'Kindly transfer weightage of my course']
+specific_questions = ['I want to drop a course', '17L-4004',
+                      'CS 410', 'I want to drop a course', '17L-4004', 'CS 410']
 weird_questions = ['Where is the statue of liberty?', 'Coffee places nearby']
 joke_questions = ['Tell me a joke']
 counter = -1
@@ -310,70 +314,71 @@ counter = -1
 def get_answer(transcript):
     global counter
 
-    counter += 1
-    if (counter > len(joke_questions)):
-        print("TEST QUESTIONS COMPLETE")
-        counter = 0
+    if (transcript):
+        counter += 1
+        if (counter > len(joke_questions)):
+            print("TEST QUESTIONS COMPLETE")
+            counter = 0
 
-    transcript = joke_questions[counter]
-    
-    # GOOGLE
-    api_key = 'embeddedassistant.googleapis.com'
-    credentials = 'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
-    device_id = '6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d'
-    device_model_id = 'watson-73b2e-watsongoogle-famt7c'
-    lang = 'en-US'
-    display = False
-    verbose = False
-    grpc = 185
-    reply = GoogleAPI(api_key, credentials, device_model_id,
-                      device_id, lang, display, verbose, grpc, transcript)
+        #transcript = 'How much wood could a woodchuck chuck if a woodchuck could chuck wood?'
+        #transcript = joke_questions[counter]
+        # GOOGLE
+        api_key = 'embeddedassistant.googleapis.com'
+        credentials = 'C:\\Users\\ather\\AppData\\Roaming\\google-oauthlib-tool\\credentials.json'
+        device_id = '6d0bf190-5b07-11ea-b5ca-ecf4bb451b5d'
+        device_model_id = 'watson-73b2e-watsongoogle-famt7c'
+        lang = 'en-US'
+        display = False
+        verbose = False
+        grpc = 185
+        reply = GoogleAPI(api_key, credentials, device_model_id,
+                          device_id, lang, display, verbose, grpc, transcript)
 
-    # IBM
-    if reply is None:
-        message = json.dumps(WATSON_ASSISTANT.message(
-            "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
-            input={'text': transcript},
-            context={
-                'metadata': {
-                    'deployment': 'myDeployment'
-                }
-            }).get_result())
-        parsed_message = json.loads(message)
-        reply = parsed_message['output']['generic'][0]['text']
-        intents = parsed_message['output']['intents']
+        # IBM
+        if reply is None:
+            message = json.dumps(WATSON_ASSISTANT.message(
+                "9bf7bf36-235e-4089-bf1d-113791da5b43", WATSON_KEY,
+                input={'text': transcript},
+                context={
+                    'metadata': {
+                        'deployment': 'myDeployment'
+                    }
+                }).get_result())
+            parsed_message = json.loads(message)
+            reply = parsed_message['output']['generic'][0]['text']
+            intents = parsed_message['output']['intents']
 
-        #Answer received
-        if len(intents) is not 0:
-            print("Your question: ", transcript)
-            print('Reply: ', reply)
-        
-        #no answer from ibm or google
+            # Answer received
+            if len(intents) is not 0:
+                print("Your question: ", transcript)
+                print('Reply: ', reply)
+
+            # no answer from ibm or google
+            else:
+                reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
+                print("Your question: ", transcript)
+                print("Reply: ", reply)
+
+        #temp = demoji.replace(reply, " ")
+        # print(temp)
+
+        reply = emoji.demojize(reply)
+        """ this will replace your emoji with :emoji_name:, 
+            which should be removed by the dictionary lookup
+        """
+
+        # TONE ANALYSIS
+        tone = TONE_SERVICE.tone(
+            tone_input=reply, content_type="text/plain").get_result()
+        if(tone['document_tone']['tones']):
+            arr = tone['document_tone']['tones']
+            newlist = sorted(arr, key=lambda k: k['score'], reverse=True)
+            tone = newlist[0]['tone_name']
         else:
-            reply = "Sorry, I could not understand that. Could you try rephrasing your question?"
-            print("Your question: ", transcript)
-            print("Reply: ", reply)
-    
-    #temp = demoji.replace(reply, " ")
-    #print(temp)
+            tone = "Neutral"
+        print('Reply tone: ', tone)
 
-    reply = emoji.demojize(reply)
-    """ this will replace your emoji with :emoji_name:, 
-        which should be removed by the dictionary lookup
-    """
-    
-
-
-    # TONE ANALYSIS
-    tone = TONE_SERVICE.tone(
-        tone_input=reply, content_type="text/plain").get_result()
-    if(tone['document_tone']['tones']):
-        arr = tone['document_tone']['tones']
-        newlist = sorted(arr, key=lambda k: k['score'], reverse=True)
-        tone = newlist[0]['tone_name']
-    else:
-        tone = "Neutral"
-    print('Reply tone: ', tone)
+        get_speech(transcript, reply)
 
 
 # STT
@@ -461,13 +466,17 @@ def on_error(self, error):
 
 
 def on_close(ws):
+    global FINALS
     """Upon close, print the complete and final transcript."""
-    transcript = "".join([x['results'][0]['alternatives'][0]['transcript']
-                          for x in FINALS])
+    if (FINALS):
+        transcript = "".join(
+            [x['results'][0]['alternatives'][0]['transcript'] for x in FINALS])
+    else:
+        transcript = ""
+    FINALS = []
     # print("\nHere's the transcript:\n")
     # print(transcript)
     get_answer(transcript)
-
 # SST
 
 
